@@ -1,7 +1,7 @@
 import random
 
 from minichess.game import (
-    BLACK, KING, WHITE, State, apply, decode_move, encode_move, in_check,
+    BLACK, KING, KNIGHT, PAWN, QUEEN, WHITE, State, apply, decode_move, encode_move, in_check,
     initial_state, is_attacked, legal_moves, make_piece, move_name,
     parse_square, pseudo_legal_moves, status,
 )
@@ -22,15 +22,15 @@ def names(state):
 
 def test_initial_layout():
     s = initial_state()
-    assert s.to_string() == "RNBQKPPPPP" + "." * 5 + "ppppp" + "rnbqk" + "w"
+    assert s.to_string() == "RNQKNPPPPP" + "." * 5 + "ppppp" + "rnqkn" + "w"
     assert s.turn == WHITE and s.ply == 0
 
 
 def test_initial_legal_moves_white_and_black():
     s = initial_state()
-    assert names(s) == sorted(["a2a3", "b2b3", "c2c3", "d2d3", "e2e3", "b1a3", "b1c3"])
+    assert names(s) == sorted(["a2a3", "b2b3", "c2c3", "d2d3", "e2e3", "b1a3", "b1c3", "e1d3"])
     black = State(s.squares, BLACK)
-    assert names(black) == sorted(["a4a3", "b4b3", "c4c3", "d4d3", "e4e3", "b5a3", "b5c3"])
+    assert names(black) == sorted(["a4a3", "b4b3", "c4c3", "d4d3", "e4e3", "b5a3", "b5c3", "e5d3"])
 
 
 def test_apply_pawn_push():
@@ -124,7 +124,7 @@ def test_stalemate():
     assert status(s) == (0, "stalemate")
 
 
-def test_white_pawn_rush_wins_instantly():
+def test_white_pawn_promotes_to_queen():
     s = board("""
         .....
         .P...
@@ -134,10 +134,11 @@ def test_white_pawn_rush_wins_instantly():
     """)
     assert status(s)[0] is None
     s2 = apply(s, encode_move(parse_square("b4"), parse_square("b5")))
-    assert status(s2) == (1, "white pawn reached the last rank")
+    assert s2.squares[parse_square("b5")] == make_piece(QUEEN, WHITE)
+    assert status(s2)[0] is None
 
 
-def test_black_pawn_rush_wins_instantly():
+def test_black_pawn_promotes_to_queen():
     s = board("""
         k...K
         .....
@@ -146,7 +147,8 @@ def test_black_pawn_rush_wins_instantly():
         .....
     """, turn=BLACK)
     s2 = apply(s, encode_move(parse_square("c2"), parse_square("c1")))
-    assert status(s2) == (-1, "black pawn reached the last rank")
+    assert s2.squares[parse_square("c1")] == make_piece(QUEEN, BLACK)
+    assert status(s2)[0] is None
 
 
 def test_insufficient_material_draws():
@@ -204,3 +206,23 @@ def test_random_playouts_keep_invariants():
             king_sq = s.squares.index(make_piece(KING, mover))
             assert not is_attacked(s.squares, king_sq, s.turn)
     assert finished == 200
+
+
+def test_pawn_double_step():
+    start = initial_state()
+    # pawns start on ranks 2/4, so the double step is blocked in the initial position
+    assert "a2a4" not in names(start)
+    sq = list(start.squares)
+    sq[parse_square("a4")] = 0
+    assert {"a2a3", "a2a4"} <= set(names(State(tuple(sq), WHITE)))
+    # blocked intermediate square
+    sq[parse_square("a3")] = make_piece(KNIGHT, BLACK)
+    assert "a2a4" not in names(State(tuple(sq), WHITE))
+    # no double step from a non-start rank
+    sq[parse_square("a3")] = make_piece(PAWN, WHITE)
+    sq[parse_square("a2")] = 0
+    assert "a3a5" not in names(State(tuple(sq), WHITE))
+    # black mirror: a4 pawn, a3/a2 empty
+    sq = list(start.squares)
+    sq[parse_square("a2")] = 0
+    assert {"a4a3", "a4a2"} <= set(names(State(tuple(sq), BLACK)))

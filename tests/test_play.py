@@ -25,9 +25,9 @@ def run(moves, state=None):
 
 def test_render_initial_board():
     text = render(initial_state())
-    assert text.splitlines()[0] == "5  r n b q k"
+    assert text.splitlines()[0] == "5  r n q k n"
     assert text.splitlines()[1] == "4  p p p p p"
-    assert text.splitlines()[4] == "1  R N B Q K"
+    assert text.splitlines()[4] == "1  R N Q K N"
     assert text.splitlines()[-1] == "   a b c d e"
 
 
@@ -58,20 +58,20 @@ def test_illegal_move_reasons():
     assert "check" in explain_illegal(pinned, parse_square("a3"), parse_square("b4"))
 
 
-def test_scripted_game_with_rejections_ends_in_pawn_win():
+def test_scripted_game_with_rejections_ends_in_promotion_mate():
     s = board("""
-        .....
-        .P...
-        ....k
-        .....
+        k....
+        ..P..
         K....
+        .....
+        .....
     """)
-    result, out = run(["xx", "e3e4", "a1a3", "b4b5"], s)
+    result, out = run(["xx", "a5a4", "a3a5", "c4c5"], s)
     assert result == 1
     assert "Could not read that" in out
     assert "belongs to your opponent" in out
     assert "cannot move" in out
-    assert "Game over: White wins (white pawn reached the last rank)." in out
+    assert "Game over: White wins (checkmate)." in out
 
 
 def test_checkmate_is_announced():

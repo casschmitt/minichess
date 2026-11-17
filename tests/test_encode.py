@@ -38,9 +38,9 @@ def test_observation_shape_and_piece_count():
 def test_plane_assignment_for_white():
     obs = encode_state(initial_state())
     assert obs[0, 1, 0] == 1       # own pawn on a2 (rank index 1, file 0)
-    assert obs[5, 0, 4] == 1       # own king on e1
+    assert obs[5, 0, 3] == 1       # own king on d1
     assert obs[6, 3, 0] == 1       # opponent pawn on a4
-    assert obs[11, 4, 4] == 1      # opponent king on e5
+    assert obs[11, 4, 3] == 1      # opponent king on d5
 
 
 def test_black_to_move_on_initial_position_encodes_like_white():
@@ -50,9 +50,9 @@ def test_black_to_move_on_initial_position_encodes_like_white():
     assert (legal_mask(black) == legal_mask(start)).all()   # canonical moves match too
 
 
-def test_legal_mask_initial_has_seven_moves():
+def test_legal_mask_initial_has_eight_moves():
     mask = legal_mask(initial_state())
-    assert mask.dtype == bool and mask.shape == (625,) and mask.sum() == 7
+    assert mask.dtype == bool and mask.shape == (625,) and mask.sum() == 8
 
 
 def test_mask_in_canonical_indices_matches_real_actions_for_black():

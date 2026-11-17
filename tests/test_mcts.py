@@ -48,31 +48,6 @@ def test_black_finds_mate_in_one_too():
     assert status(apply(s, action)) == (-1, "checkmate"), move_name(action)
 
 
-def test_finds_pawn_rush_win():
-    s = board("""
-        .....
-        .P...
-        ....k
-        .....
-        K....
-    """)
-    m = make(sims=60)
-    action = m.select_action(m.search(s))
-    assert move_name(action) == "b4b5"
-
-
-def test_black_finds_pawn_rush_win():
-    s = board("""
-        K....
-        .....
-        ....k
-        .p...
-        .....
-    """, turn=BLACK)
-    m = make(sims=60)
-    assert move_name(m.select_action(m.search(s))) == "b2b1"
-
-
 def test_visit_policy_is_a_distribution_on_legal_moves():
     for turn in (WHITE, BLACK):
         s = State(initial_state().squares, turn)

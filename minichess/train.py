@@ -39,6 +39,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--sims", type=int, default=30, help="MCTS simulations per move in self-play")
     p.add_argument("--steps", type=int, default=150, help="gradient steps per iteration")
     p.add_argument("--batch", type=int, default=128)
+    p.add_argument("--log-every", type=int, default=25, help="print loss every N gradient steps (0 = off)")
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--lr-decay", type=float, default=0.95, help="learning-rate factor per iteration")
     p.add_argument("--weight-decay", type=float, default=1e-4)
@@ -59,11 +60,16 @@ def parse_args(argv=None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def train_steps(net: PolicyValueNet, opt, buf: ReplayBuffer, steps: int, batch: int):
-    """Run gradient steps on random batches. Returns mean (policy loss, value loss)."""
+def train_steps(net: PolicyValueNet, opt, buf: ReplayBuffer, steps: int, batch: int,
+                log_every: int = 0, tag: str = ""):
+    """Run gradient steps on random batches. Returns mean (policy loss, value loss).
+
+    If ``log_every`` > 0, prints the mean loss over each window of that many steps.
+    """
     net.train()
     pol = val = 0.0
-    for _ in range(steps):
+    win_pol = win_val = 0.0
+    for i in range(1, steps + 1):
         obs, pi, z = buf.sample(batch)
         logits, v = net(torch.from_numpy(obs))
         policy_loss = -(torch.from_numpy(pi) * F.log_softmax(logits, dim=-1)).sum(-1).mean()
@@ -71,8 +77,17 @@ def train_steps(net: PolicyValueNet, opt, buf: ReplayBuffer, steps: int, batch: 
         opt.zero_grad()
         (policy_loss + value_loss).backward()
         opt.step()
-        pol += policy_loss.item()
-        val += value_loss.item()
+        p_item, v_item = policy_loss.item(), value_loss.item()
+        pol += p_item
+        val += v_item
+        if log_every > 0:
+            win_pol += p_item
+            win_val += v_item
+            if i % log_every == 0 or i == steps:
+                n = log_every if i % log_every == 0 else i % log_every
+                print(f"{tag}  step {i:4d}/{steps} | pol {win_pol / n:.3f} val {win_val / n:.3f}",
+                      flush=True)
+                win_pol = win_val = 0.0
     return pol / max(1, steps), val / max(1, steps)
 
 
@@ -178,7 +193,9 @@ def main(argv=None) -> None:
                                          args.workers, args.max_ply)
             buf.add(obs, pi, z)
             t_sp = time.time() - t_iter
-            ploss, vloss = (train_steps(net, opt, buf, args.steps, args.batch)
+            print(f"iter {it:3d}: self-play done in {t_sp:.0f}s, training ...", flush=True)
+            ploss, vloss = (train_steps(net, opt, buf, args.steps, args.batch,
+                                        args.log_every, f"iter {it:3d}")
                             if len(buf) >= args.batch else (float("nan"), float("nan")))
 
             vs_random = parallel_match(net, None, args.eval_games, args.eval_sims,

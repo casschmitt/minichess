@@ -1,5 +1,5 @@
 from minichess.controller import GameController
-from minichess.game import BLACK, WHITE, State, initial_state, parse_square as sq
+from minichess.game import QUEEN, make_piece, BLACK, WHITE, State, initial_state, parse_square as sq
 
 
 def board(diagram: str, turn=WHITE) -> State:
@@ -52,7 +52,7 @@ def test_game_over_locks_input():
     assert not c.try_move(sq("a5"), sq("a4"))
 
 
-def test_pawn_win_ends_game():
+def test_pawn_promotes_and_game_continues():
     s = board("""
         .....
         .P...
@@ -63,5 +63,6 @@ def test_pawn_win_ends_game():
     c = GameController(s)
     assert not c.game_over
     assert c.try_move(sq("b4"), sq("b5"))
-    assert c.game_over and c.result == 1
+    assert not c.game_over
+    assert c.state.squares[sq("b5")] == make_piece(QUEEN, WHITE)
     assert c.undo() and not c.game_over

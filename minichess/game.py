@@ -4,8 +4,9 @@ Squares are indexed 0..24 as ``rank * 5 + file`` (a1 = 0, e1 = 4, a5 = 20, e5 = 
 Without castling or en passant, a position is fully described by piece placement
 plus the side to move. ``ply`` is only a move counter used for the draw cap.
 
-Rules: pawns push one step and capture diagonally; a pawn reaching the far rank
-wins instantly; otherwise standard check / checkmate / stalemate rules apply.
+Rules: back rank is R N Q K N; pawns push one step (or two from their start rank
+if both squares are free) and capture diagonally; a pawn reaching the far rank
+auto-promotes to a queen; standard check / checkmate / stalemate rules apply.
 """
 from __future__ import annotations
 
@@ -138,7 +139,7 @@ class State:
 
 
 def initial_state() -> State:
-    back = (ROOK, KNIGHT, BISHOP, QUEEN, KING)
+    back = (ROOK, KNIGHT, QUEEN, KING, KNIGHT)
     squares = [EMPTY] * NUM_SQ
     for f in range(SIZE):
         squares[f] = make_piece(back[f], WHITE)
@@ -206,6 +207,11 @@ def pseudo_legal_moves(state: State) -> list[tuple[int, int]]:
             if 0 <= nr < SIZE:
                 if squares[nr * SIZE + f] == EMPTY:
                     moves.append((sq, nr * SIZE + f))
+                    start = 1 if turn == WHITE else SIZE - 2
+                    if r == start:
+                        nr2 = nr + (nr - r)
+                        if squares[nr2 * SIZE + f] == EMPTY:
+                            moves.append((sq, nr2 * SIZE + f))
                 for nf in (f - 1, f + 1):
                     if 0 <= nf < SIZE:
                         t = nr * SIZE + nf
@@ -255,7 +261,13 @@ def legal_moves(state: State) -> list[int]:
 def apply(state: State, action: int) -> State:
     """Play ``action`` (assumed legal) and return the new state."""
     frm, to = decode_move(action)
-    return State(_move_squares(state.squares, frm, to), 1 - state.turn, state.ply + 1)
+    squares = _move_squares(state.squares, frm, to)
+    p = squares[to]
+    if kind_of(p) == PAWN and to // SIZE == (SIZE - 1 if color_of(p) == WHITE else 0):
+        s = list(squares)
+        s[to] = make_piece(QUEEN, color_of(p))
+        squares = tuple(s)
+    return State(squares, 1 - state.turn, state.ply + 1)
 
 
 # ---------------------------------------------------------------- terminal detection
@@ -272,10 +284,6 @@ def status(state: State, max_ply: int = MAX_PLY,
     ``legal`` may carry already-computed ``legal_moves(state)`` to avoid recomputing them.
     """
     sq = state.squares
-    if any(sq[(SIZE - 1) * SIZE + f] == make_piece(PAWN, WHITE) for f in range(SIZE)):
-        return 1, "white pawn reached the last rank"
-    if any(sq[f] == make_piece(PAWN, BLACK) for f in range(SIZE)):
-        return -1, "black pawn reached the last rank"
     if legal is None:
         legal = legal_moves(state)
     if not legal:
